@@ -153,6 +153,14 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     ai->TellMaster("Hello!");
 }
 
+/**
+ * @brief Processes a bot command.
+ * @param cmd The command to process.
+ * @param guid The GUID of the bot.
+ * @param admin Whether the command is from an admin.
+ * @param masterAccountId The account ID of the master.
+ * @return The result of the command.
+ */
 bool PlayerbotHolder::ProcessBotCommand(string cmd, ObjectGuid guid, bool admin, uint32 masterAccountId)
 {
     if (!sPlayerbotAIConfig.enabled || guid.IsEmpty())
@@ -281,6 +289,12 @@ bool ChatHandler::HandlePlayerbotCommand(char* args)
     return false;
 }
 
+/**
+ * @brief Handles the player bot command.
+ * @param args The command arguments.
+ * @param master Pointer to the master player.
+ * @return A list of messages resulting from the command.
+ */
 list<string> PlayerbotHolder::HandlePlayerbotCommand(char* args, Player* master)
 {
     list<string> messages;

@@ -19,6 +19,7 @@ PlayerbotAIConfig::PlayerbotAIConfig()
       globalCoolDown(0),
       reactDelay(0),
       maxWaitForMove(0),
+      passiveDelay(0),
       sightDistance(0.0f),
       spellDistance(0.0f),
       reactDistance(0.0f),
@@ -117,6 +118,7 @@ bool PlayerbotAIConfig::Initialize()
     globalCoolDown = (uint32) config.GetIntDefault("AiPlayerbot.GlobalCooldown", 500);
     maxWaitForMove = config.GetIntDefault("AiPlayerbot.MaxWaitForMove", 3000);
     reactDelay = (uint32) config.GetIntDefault("AiPlayerbot.ReactDelay", 100);
+    passiveDelay = (uint32) config.GetIntDefault("AiPlayerbot.PassiveDelay", 3000);
 
     sightDistance = config.GetFloatDefault("AiPlayerbot.SightDistance", 50.0f);
     spellDistance = config.GetFloatDefault("AiPlayerbot.SpellDistance", 30.0f);

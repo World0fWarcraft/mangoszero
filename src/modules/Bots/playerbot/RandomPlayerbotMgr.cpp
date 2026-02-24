@@ -247,7 +247,9 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 botLevel = player->getLevel();
     uint32 maxLevel = sPlayerbotAIConfig.randomBotMaxLevel;
     if (maxLevel > sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL))
+    {
         maxLevel = sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL);
+    }
     if (botLevel < sPlayerbotAIConfig.randomBotMinLevel || botLevel > maxLevel)
     {
         sLog.outDetail("Bot %d level %d is outside valid range (%d-%d), scheduling immediate re-randomization",
@@ -308,8 +310,8 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, vector<WorldLocation> &locs
         }
 
         if (!terrain->IsOutdoors(x, y, z) ||
-                terrain->IsUnderWater(x, y, z) ||
-                terrain->IsInWater(x, y, z))
+            +terrain->IsUnderWater(x, y, z) ||
+            +terrain->IsInWater(x, y, z))
             continue;
 
         sLog.outDetail("Random teleporting bot %s to %s %f,%f,%f", bot->GetName(), area->area_name[0], x, y, z);
@@ -506,8 +508,10 @@ uint32 RandomPlayerbotMgr::GetZoneLevel(uint32 mapId, float teleX, float teleY, 
 
 void RandomPlayerbotMgr::Refresh(Player* bot)
 {
+    sLog.outDetail("Refreshing bot %s", bot->GetName());
     if (bot->IsDead())
     {
+        // Resurrect the bot if it is dead
         PlayerbotChatHandler ch(bot);
         ch.revive(*bot);
         bot->GetPlayerbotAI()->ResetStrategies();
@@ -533,6 +537,7 @@ void RandomPlayerbotMgr::Refresh(Player* bot)
     bot->RemoveAllAttackers();
     bot->ClearInCombat();
 
+    // Repair all items, set health and power to maximum, and enable PvP
     bot->DurabilityRepairAll(false, 1.0f);
     bot->SetHealthPercent(100);
     bot->SetPvP(true);
@@ -781,7 +786,9 @@ void RandomPlayerbotMgr::CalculateAreaCreatureStats()
     {
         std::vector<uint8>& levels = itr->second;
         if (levels.size() < 10) // need at least 10 creatures to have meaningful statistics
+        {
             continue;
+        }
 
         std::sort(levels.begin(), levels.end());
 
@@ -798,7 +805,6 @@ void RandomPlayerbotMgr::CalculateAreaCreatureStats()
 
     sLog.outString(">> [Playerbots] Calculated spawn stats for %u areas", statsCount);
 }
-
 
 bool ChatHandler::HandlePlayerbotConsoleCommand(char* args)
 {
@@ -961,6 +967,7 @@ void RandomPlayerbotMgr::OnPlayerLogin(Player* player)
     if (!player->GetPlayerbotAI())
     {
         players.push_back(player);
+        sLog.outDebug("Including non-random bot player %s into random bot update", player->GetName());
     }
 }
 
@@ -997,7 +1004,7 @@ void RandomPlayerbotMgr::PrintStats()
         perClass[cls] = 0;
     }
 
-    int dps = 0, heal = 0, tank = 0;
+    int dps = 0, heal = 0, tank = 0, active = 0;
     for (PlayerBotMap::iterator i = playerBots.begin(); i != playerBots.end(); ++i)
     {
         Player* bot = i->second;
@@ -1012,6 +1019,11 @@ void RandomPlayerbotMgr::PrintStats()
 
         perRace[bot->getRace()]++;
         perClass[bot->getClass()]++;
+
+        if (bot->GetPlayerbotAI()->IsActive())
+        {
+            active++;
+        }
 
         int spec = AiFactory::GetPlayerSpecTab(bot);
         switch (bot->getClass())
@@ -1113,6 +1125,8 @@ void RandomPlayerbotMgr::PrintStats()
     sLog.outString("    tank: %d", tank);
     sLog.outString("    heal: %d", heal);
     sLog.outString("    dps: %d", dps);
+
+    sLog.outString("Active bots: %d", active);
 }
 
 double RandomPlayerbotMgr::GetBuyMultiplier(Player* bot)

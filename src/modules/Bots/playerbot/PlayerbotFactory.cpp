@@ -20,6 +20,9 @@ uint32 PlayerbotFactory::tradeSkills[] =
     SKILL_ENCHANTING,
     SKILL_SKINNING,
     SKILL_TAILORING,
+#if !defined(CLASSIC)
+    SKILL_JEWELCRAFTING,
+#endif
     SKILL_LEATHERWORKING,
     SKILL_ENGINEERING,
     SKILL_HERBALISM,
@@ -108,13 +111,16 @@ void PlayerbotFactory::Prepare()
  */
 void PlayerbotFactory::Randomize(bool incremental)
 {
+    sLog.outDetail("Preparing to randomize...");
     Prepare();
 
+    sLog.outDetail("Resetting player...");
     bot->resetTalents(true);
     ClearSpells();
     ClearInventory();
     bot->SaveToDB();
 
+    sLog.outDetail("Initializing quests...");
     InitQuests();
     // quest rewards boost bot level, so reduce back
     bot->SetLevel(level);
@@ -123,29 +129,58 @@ void PlayerbotFactory::Randomize(bool incremental)
     CancelAuras();
     bot->SaveToDB();
 
+    sLog.outDetail("Initializing spells (step 1)...");
     InitAvailableSpells();
+
+    sLog.outDetail("Initializing skills (step 1)...");
     InitSkills();
     InitTradeSkills();
+
+    sLog.outDetail("Initializing talents...");
     InitTalents();
+
+    sLog.outDetail("Initializing spells (step 2)...");
     InitAvailableSpells();
     InitSpecialSpells();
+
+    sLog.outDetail("Initializing Quest Spells...");
     InitQuestSpells();
+
+    sLog.outDetail("Initializing mounts...");
     InitMounts();
+
+    sLog.outDetail("Initializing skills (step 2)...");
     UpdateTradeSkills();
     bot->SaveToDB();
 
+    sLog.outDetail("Initializing equipment...");
     InitEquipment(incremental);
+
+    sLog.outDetail("Initializing bags...");
     InitBags();
+
+    sLog.outDetail("Initializing ammo...");
     InitAmmo();
+
+    sLog.outDetail("Initializing food...");
     InitFood();
+
+    sLog.outDetail("Initializing potions...");
     InitPotions();
+
+    sLog.outDetail("Initializing second equipment set...");
     InitSecondEquipmentSet();
+
+    sLog.outDetail("Initializing inventory...");
     InitInventory();
+
+    sLog.outDetail("Initializing pet...");
+    InitPet();
+
+    sLog.outDetail("Saving to DB...");
     bot->SetMoney(urand(level * 1000, level * 5 * 1000));
     bot->SaveToDB();
-
-    InitPet();
-    bot->SaveToDB();
+    sLog.outDetail("Done.");
 }
 
 /**
@@ -1213,6 +1248,9 @@ void PlayerbotFactory::UpdateTradeSkills()
     }
 }
 
+/**
+ * Initializes the skills for the player bot based on its class and level.
+ */
 void PlayerbotFactory::InitSkills()
 {
     uint32 maxValue = level * 5;
@@ -1642,14 +1680,21 @@ void PlayerbotFactory::InitQuests()
     }
 }
 
+/**
+ * Clears the inventory of the player bot.
+ */
 void PlayerbotFactory::ClearInventory()
 {
     DestroyItemsVisitor visitor(bot);
     IterateItems(&visitor);
 }
 
+/**
+ * Initializes the ammo for the player bot.
+ */
 void PlayerbotFactory::InitAmmo()
 {
+    // Check if the bot's class requires ammo
     if (bot->getClass() != CLASS_HUNTER && bot->getClass() != CLASS_ROGUE && bot->getClass() != CLASS_WARRIOR)
     {
         return;
@@ -1662,6 +1707,7 @@ void PlayerbotFactory::InitAmmo()
     }
 
     uint32 subClass = 0;
+    // Determine the type of ammo required based on the ranged weapon
     switch (pItem->GetProto()->SubClass)
     {
     case ITEM_SUBCLASS_WEAPON_GUN:
@@ -1678,6 +1724,7 @@ void PlayerbotFactory::InitAmmo()
         return;
     }
 
+    // Query the database for the highest level ammo that the bot can use
     QueryResult *results = WorldDatabase.PQuery("select max(`entry`), max(`RequiredLevel`) from `item_template` where `class` = '%u' and `subclass` = '%u' and `RequiredLevel` <= '%u'",
             ITEM_CLASS_PROJECTILE, subClass, bot->getLevel());
     if (!results)
@@ -1689,6 +1736,7 @@ void PlayerbotFactory::InitAmmo()
     if (fields)
     {
         uint32 entry = fields[0].GetUInt32();
+        // Add the ammo to the bot's inventory
         for (int i = 0; i < 5; i++)
         {
             Item* newItem = bot->StoreNewItemInInventorySlot(entry, 1000);
@@ -1921,10 +1969,13 @@ void PlayerbotFactory::InitInventorySkill()
     {
         StoreItem(2901, 1); // Mining Pick
     }
-    /*if (bot->HasSkill(SKILL_JEWELCRAFTING)) {
+#if !defined(CLASSIC)
+    if (bot->HasSkill(SKILL_JEWELCRAFTING))
+    {
         StoreItem(20815, 1); // Jeweler's Kit
         StoreItem(20824, 1); // Simple Grinder
-    }*/
+    }
+#endif
     if (bot->HasSkill(SKILL_BLACKSMITHING) || bot->HasSkill(SKILL_ENGINEERING))
     {
         StoreItem(5956, 1); // Blacksmith Hammer

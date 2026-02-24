@@ -38,9 +38,16 @@ RandomPlayerbotFactory::RandomPlayerbotFactory(uint32 accountId) : accountId(acc
     availableRaces[CLASS_WARRIOR].push_back(RACE_UNDEAD);
     availableRaces[CLASS_WARRIOR].push_back(RACE_TAUREN);
     availableRaces[CLASS_WARRIOR].push_back(RACE_TROLL);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_WARRIOR].push_back(RACE_DRAENEI);
+#endif
 
     availableRaces[CLASS_PALADIN].push_back(RACE_HUMAN);
     availableRaces[CLASS_PALADIN].push_back(RACE_DWARF);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_PALADIN].push_back(RACE_DRAENEI);
+    availableRaces[CLASS_PALADIN].push_back(RACE_BLOODELF);
+#endif
 
     availableRaces[CLASS_ROGUE].push_back(RACE_HUMAN);
     availableRaces[CLASS_ROGUE].push_back(RACE_DWARF);
@@ -48,32 +55,59 @@ RandomPlayerbotFactory::RandomPlayerbotFactory(uint32 accountId) : accountId(acc
     availableRaces[CLASS_ROGUE].push_back(RACE_GNOME);
     availableRaces[CLASS_ROGUE].push_back(RACE_ORC);
     availableRaces[CLASS_ROGUE].push_back(RACE_TROLL);
-
+#if !defined(CLASSIC)
+    availableRaces[CLASS_ROGUE].push_back(RACE_BLOODELF);
+#endif
     availableRaces[CLASS_PRIEST].push_back(RACE_HUMAN);
     availableRaces[CLASS_PRIEST].push_back(RACE_DWARF);
     availableRaces[CLASS_PRIEST].push_back(RACE_NIGHTELF);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_PRIEST].push_back(RACE_DRAENEI);
+#endif
     availableRaces[CLASS_PRIEST].push_back(RACE_TROLL);
     availableRaces[CLASS_PRIEST].push_back(RACE_UNDEAD);
-
+#if !defined(CLASSIC)
+    availableRaces[CLASS_PRIEST].push_back(RACE_DRAENEI);
+    availableRaces[CLASS_PRIEST].push_back(RACE_BLOODELF);
+#endif
     availableRaces[CLASS_MAGE].push_back(RACE_HUMAN);
     availableRaces[CLASS_MAGE].push_back(RACE_GNOME);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_MAGE].push_back(RACE_DRAENEI);
+#endif
     availableRaces[CLASS_MAGE].push_back(RACE_UNDEAD);
     availableRaces[CLASS_MAGE].push_back(RACE_TROLL);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_MAGE].push_back(RACE_DRAENEI);
+    availableRaces[CLASS_MAGE].push_back(RACE_BLOODELF);
+#endif
 
     availableRaces[CLASS_WARLOCK].push_back(RACE_HUMAN);
     availableRaces[CLASS_WARLOCK].push_back(RACE_GNOME);
     availableRaces[CLASS_WARLOCK].push_back(RACE_UNDEAD);
     availableRaces[CLASS_WARLOCK].push_back(RACE_ORC);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_WARLOCK].push_back(RACE_BLOODELF);
+#endif
 
+#if !defined(CLASSIC)
+    availableRaces[CLASS_SHAMAN].push_back(RACE_DRAENEI);
+#endif
     availableRaces[CLASS_SHAMAN].push_back(RACE_ORC);
     availableRaces[CLASS_SHAMAN].push_back(RACE_TAUREN);
     availableRaces[CLASS_SHAMAN].push_back(RACE_TROLL);
-
+#if !defined(CLASSIC)
+    availableRaces[CLASS_SHAMAN].push_back(RACE_DRAENEI);
+#endif
     availableRaces[CLASS_HUNTER].push_back(RACE_DWARF);
     availableRaces[CLASS_HUNTER].push_back(RACE_NIGHTELF);
     availableRaces[CLASS_HUNTER].push_back(RACE_ORC);
     availableRaces[CLASS_HUNTER].push_back(RACE_TAUREN);
     availableRaces[CLASS_HUNTER].push_back(RACE_TROLL);
+#if !defined(CLASSIC)
+    availableRaces[CLASS_HUNTER].push_back(RACE_DRAENEI);
+    availableRaces[CLASS_HUNTER].push_back(RACE_BLOODELF);
+#endif
 
     availableRaces[CLASS_DRUID].push_back(RACE_NIGHTELF);
     availableRaces[CLASS_DRUID].push_back(RACE_TAUREN);
@@ -104,7 +138,11 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
     uint8 facialHair = urand(0, 7);
     uint8 outfitId = 0;
 
+#if !defined(CLASSIC)
+    WorldSession* session = new WorldSession(accountId, NULL, SEC_PLAYER, MAX_EXPANSION, 0, LOCALE_enUS);
+#else
     WorldSession* session = new WorldSession(accountId, NULL, SEC_PLAYER, 0, LOCALE_enUS);
+#endif
     if (!session)
     {
         sLog.outError("Couldn't create session for random bot account %d", accountId);
@@ -148,7 +186,7 @@ string RandomPlayerbotFactory::CreateRandomBotName()
     QueryResult *result = CharacterDatabase.Query("SELECT MAX(`name_id`) FROM `ai_playerbot_names`");
     if (!result)
     {
-        // Return an empty string if the query fails
+        sLog.outError("No more names left for random bots");
         return "";
     }
 

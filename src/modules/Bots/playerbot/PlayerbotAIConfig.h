@@ -40,23 +40,23 @@ public:
      */
     bool IsInRandomQuestItemList(uint32 id);
 
-    bool enabled;
-    bool allowGuildBots;
-    uint32 globalCoolDown, reactDelay, maxWaitForMove;
+    bool enabled; ///< Indicates if the Playerbot AI is enabled.
+    bool allowGuildBots; ///< Indicates if guild bots are allowed.
+    uint32 globalCoolDown, reactDelay, maxWaitForMove, passiveDelay;
     float sightDistance, spellDistance, reactDistance, grindDistance, lootDistance,
         fleeDistance, tooCloseDistance, meleeDistance, followDistance, whisperDistance, contactDistance;
     uint32 criticalHealth, lowHealth, mediumHealth, almostFullHealth;
     uint32 lowMana, mediumMana;
 
-    bool randomBotAutologin;
-    std::string randomBotMapsAsString;
-    std::vector<uint32> randomBotMaps;
-    std::list<uint32> randomBotQuestItems;
-    std::list<uint32> randomBotAccounts;
-    std::list<uint32> randomBotSpellIds;
-    uint32 randomBotTeleportDistance;
-    float randomGearLoweringChance;
-    float randomBotMaxLevelChance;
+    bool randomBotAutologin; ///< Indicates if random bots should auto-login.
+    std::string randomBotMapsAsString; ///< Comma-separated string of random bot maps.
+    std::vector<uint32> randomBotMaps; ///< List of random bot maps.
+    std::list<uint32> randomBotQuestItems; ///< List of random bot quest items.
+    std::list<uint32> randomBotAccounts; ///< List of random bot accounts.
+    std::list<uint32> randomBotSpellIds; ///< List of random bot spell IDs.
+    uint32 randomBotTeleportDistance; ///< The teleport distance for random bots.
+    float randomGearLoweringChance; ///< The chance of lowering gear for random bots.
+    float randomBotMaxLevelChance; ///< The chance of random bots reaching max level.
     uint32 minRandomBots, maxRandomBots;
     uint32 randomBotUpdateInterval, randomBotCountChangeMinInterval, randomBotCountChangeMaxInterval;
     uint32 minRandomBotInWorldTime, maxRandomBotInWorldTime;
@@ -69,12 +69,12 @@ public:
     bool randomBotLoginAtStartup; ///< Indicates if random bots should login at startup.
     uint32 randomBotTeleLevel; ///< The teleport level for random bots.
     bool logInGroupOnly, logValuesPerTick;
-    bool fleeingEnabled;
+    bool fleeingEnabled; ///< Indicates if fleeing is enabled for bots.
     std::string randomBotCombatStrategies, randomBotNonCombatStrategies;
     uint32 randomBotMinLevel, randomBotMaxLevel;
     float randomChangeMultiplier;
-    uint32 specProbability[MAX_CLASSES][3];
-    std::string commandPrefix;
+    uint32 specProbability[MAX_CLASSES][3]; ///< Probability of class specs for random bots.
+    std::string commandPrefix; ///< Prefix for bot commands.
 
     uint32 iterationsPerTick; ///< Number of iterations per tick.
 
@@ -96,7 +96,7 @@ public:
 
 private:
     void CreateRandomBots();
-    Config config;
+    Config config; ///< Configuration object for reading from the configuration file.
 };
 
 #define sPlayerbotAIConfig MaNGOS::Singleton<PlayerbotAIConfig>::Instance()

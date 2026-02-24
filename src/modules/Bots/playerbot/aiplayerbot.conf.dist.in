@@ -67,6 +67,9 @@ AiPlayerbot.CommandPrefix = ~
 # Delay between two bot actions
 #AiPlayerbot.ReactDelay = 100
 
+# Inactivity delay
+#AiPlayerbot.PassiveDelay = 3000
+
 # Distances
 #AiPlayerbot.SightDistance = 50.0
 #AiPlayerbot.SpellDistance = 30.0

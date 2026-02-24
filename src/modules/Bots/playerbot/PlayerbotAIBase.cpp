@@ -91,3 +91,12 @@ void PlayerbotAIBase::YieldThread()
         nextAICheckDelay = sPlayerbotAIConfig.reactDelay;
     }
 }
+
+/**
+ * @brief Checks if the AI is active.
+ * @return True if the AI is active, false otherwise.
+ */
+bool PlayerbotAIBase::IsActive() const
+{
+    return nextAICheckDelay < sPlayerbotAIConfig.passiveDelay;
+}

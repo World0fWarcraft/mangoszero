@@ -263,8 +263,8 @@ private:
     void InitGlyphs();
 
 private:
-    Player* bot;
-    uint32 level;
-    uint32 itemQuality;
-    static uint32 tradeSkills[];
+    Player* bot; ///< Pointer to the player bot.
+    uint32 level; ///< The level of the player bot.
+    uint32 itemQuality; ///< The quality of items to be equipped by the player bot.
+    static uint32 tradeSkills[]; ///< Array of trade skills.
 };

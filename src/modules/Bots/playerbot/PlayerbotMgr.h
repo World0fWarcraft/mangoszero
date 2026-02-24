@@ -41,7 +41,7 @@ protected:
     PlayerBotMap playerBots;
 };
 
-class MANGOS_DLL_SPEC PlayerbotMgr : public PlayerbotHolder
+class PlayerbotMgr : public PlayerbotHolder
 {
 public:
     PlayerbotMgr(Player* const master);

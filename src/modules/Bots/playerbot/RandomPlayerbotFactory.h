@@ -12,7 +12,11 @@ class Item;
 
 using namespace std;
 
-class MANGOS_DLL_SPEC RandomPlayerbotFactory
+/**
+ * @brief Factory class for creating random player bots.
+ * This class provides methods to create and manage random player bots, including their names and guilds.
+ */
+class RandomPlayerbotFactory
 {
 public:
     /**
@@ -35,6 +39,10 @@ public:
     bool CreateRandomBot(uint8 cls);
 
     private:
+    /**
+     * @brief Creates a random name for a player bot.
+     * @return The random name for the player bot.
+     */
         string CreateRandomBotName();
 
 

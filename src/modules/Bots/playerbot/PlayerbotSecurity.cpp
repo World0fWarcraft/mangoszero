@@ -183,7 +183,7 @@ bool PlayerbotSecurity::CheckLevelFor(PlayerbotSecurityLevel level, bool silent,
             break;
         case PLAYERBOT_DENY_FAR:
             {
-                out << "I am too far away";
+                out << "You must be closer to invite me to your group. I am in ";
 
                 uint32 area = bot->GetAreaId();
                 if (area)

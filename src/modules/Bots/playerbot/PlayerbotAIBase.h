@@ -57,6 +57,12 @@ public:
      */
     virtual void UpdateAIInternal(uint32 elapsed) = 0;
 
+    /**
+     * @brief Checks if the AI is active.
+     * @return True if the AI is active, false otherwise.
+     */
+    bool IsActive() const;
+
 protected:
     uint32 nextAICheckDelay; ///< The delay for the next AI check in milliseconds.
 };

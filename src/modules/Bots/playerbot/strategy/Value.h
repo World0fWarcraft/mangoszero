@@ -96,9 +96,9 @@ namespace ai
         virtual T Calculate() = 0;
 
     protected:
-        int checkInterval;
+        int checkInterval; ///< The interval at which the value is checked.
         int ticksElapsed;
-        T value;
+        T value; ///< The cached value.
     };
 
 
