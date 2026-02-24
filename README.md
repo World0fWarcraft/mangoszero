@@ -6,7 +6,7 @@ alt="GitHub last commit" border=0 valign="top"/>][61]
 [<img alt="Downloads on GitHub" src="https://img.shields.io/github/downloads/mangoszero/server/total.svg?style=flat-square" border=0 valign="top"/>][61]
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>Build Status:</b>
- Linux/MAC: [<img src='https://github.com/mangoszero/server/actions/workflows/core_build.yml/badge.svg' border=0 valign="middle">][10]
+ Linux/MAC: [<img src='https://github.com/mangoszero/server/actions/workflows/core_linux_build.yml/badge.svg' border=0 valign="middle">][10]
  Windows: [<img src='https://ci.appveyor.com/api/projects/status/github/mangoszero/server?branch=master&svg=true' border=0 valign="middle">][11]
  <br><b>Repository Status:</b> 
 [<img src='https://api.codacy.com/project/badge/Grade/714e767d4df146a985ffff368c558503' border=0 valign="middle"/>][12]
