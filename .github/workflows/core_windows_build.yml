@@ -1,5 +1,8 @@
 name: Windows Build (MSVC)
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ master , devel ]
@@ -13,14 +16,14 @@ jobs:
       fail-fast: false
 
     steps:
-      
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
 
-      
+
       - name: Cache OpenSSL
         id: cache-openssl
         uses: actions/cache@v4
@@ -30,7 +33,7 @@ jobs:
             C:\Program Files\OpenSSL-Win64
           key: ${{ runner.os }}-openssl-full
 
-      
+
       - name: Install full OpenSSL (developer)
         if: steps.cache-openssl.outputs.cache-hit != 'true'
         shell: powershell
@@ -40,13 +43,13 @@ jobs:
           $ver = & openssl version
           Write-Host "Installed OpenSSL version: $ver"
 
-      
+
       - name: Setup Windows 10 SDK
         uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
         with:
           sdk-version: 22621
 
-      
+
       - name: Configure OpenSSL environment
         shell: bash
         run: |
@@ -62,7 +65,7 @@ jobs:
             echo "OPENSSL_SSL_LIBRARY=C:/Program Files/OpenSSL-Win64/lib/VC/libssl64MT.lib" >> $GITHUB_ENV
           fi
 
-      
+
       - name: Cache CMake build
         uses: actions/cache@v4
         with:
@@ -71,7 +74,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cmake-
 
-      
+
       - name: Configure CMake project
         shell: bash
         run: |
@@ -91,7 +94,7 @@ jobs:
             -DUSE_STORMLIB=1 \
             -DPCH=0
 
-      
+
       - name: Build project
         shell: bash
         run: |
