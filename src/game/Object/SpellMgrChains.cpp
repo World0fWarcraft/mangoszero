@@ -177,7 +177,7 @@ void SpellMgr::LoadSpellChains()
             }
 
             // ignore spell without forwards (non ranked or missing info in skill abilities)
-            uint32 forward_id = ab_itr->second->forward_spellid;
+            uint32 forward_id = ab_itr->second->SupercededBySpell;
 
             // by some strange reason < 3.x clients not have forward spell for 2366
             if (spell_id == 2366)                           // Herb Gathering, Apprentice
@@ -380,7 +380,7 @@ void SpellMgr::LoadSpellChains()
                     continue;
                 }
 
-                if (node.req != talentEntry->DependsOnSpell)
+                if (node.req != talentEntry->RequiredSpellID)
                 {
                     sLog.outErrorDb("Talent %u (prev: %u, first: %u, rank: %d, req: %u) listed in `spell_chain` has wrong required spell.",
                         spell_id, node.prev, node.first, node.rank, node.req);
@@ -619,7 +619,7 @@ void SpellMgr::LoadSpellLearnSpells()
                 // talent or passive spells or skill-step spells auto-casted and not need dependent learning,
                 // pet teaching spells don't must be dependent learning (casted)
                 // other required explicit dependent learning
-                dbc_node.autoLearned = entry->EffectImplicitTargetA[i] == TARGET_PET || GetTalentSpellCost(spell) > 0 || IsPassiveSpell(entry) || entry->HasSpellEffect(SPELL_EFFECT_SKILL_STEP);
+                dbc_node.autoLearned = entry->ImplicitTargetA[i] == TARGET_PET || GetTalentSpellCost(spell) > 0 || IsPassiveSpell(entry) || entry->HasSpellEffect(SPELL_EFFECT_SKILL_STEP);
 
                 SpellLearnSpellMapBounds db_node_bounds = GetSpellLearnSpellMapBounds(spell);
 

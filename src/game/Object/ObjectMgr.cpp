@@ -1254,7 +1254,7 @@ void ObjectMgr::LoadPetCreateSpells()
             continue;
         }
 
-        learnCache[spellproto->EffectTriggerSpell[0]] = spellproto->Id;
+        learnCache[spellproto->EffectTriggerSpell[0]] = spellproto->ID;
     }
 
     // fill data from DBC as more correct source if available
@@ -1276,7 +1276,7 @@ void ObjectMgr::LoadPetCreateSpells()
         PetCreateSpellEntry PetCreateSpell;
         for (int i = 0; i < MAX_CREATURE_SPELL_DATA_SLOT; ++i)
         {
-            uint32 petspell_id = petSpellEntry->spellId[i];
+            uint32 petspell_id = petSpellEntry->SpellId[i];
             if (petspell_id)
             {
                 // in dbc stored spell for pet use, but for teaching work we need learn spell ids
@@ -2622,7 +2622,7 @@ bool PlayerCondition::Meets(Player const* player, Map const* map, WorldObject co
             Unit::SpellAuraHolderMap const& auras = player->GetSpellAuraHolderMap();
             for (Unit::SpellAuraHolderMap::const_iterator itr = auras.begin(); itr != auras.end(); ++itr)
             {
-                if ((itr->second->GetSpellProto()->HasAttribute(SPELL_ATTR_CASTABLE_WHILE_MOUNTED) || itr->second->GetSpellProto()->HasAttribute(SPELL_ATTR_ABILITY)) && itr->second->GetSpellProto()->SpellVisual == 3580)
+                if ((itr->second->GetSpellProto()->HasAttribute(SPELL_ATTR_CASTABLE_WHILE_MOUNTED) || itr->second->GetSpellProto()->HasAttribute(SPELL_ATTR_ABILITY)) && itr->second->GetSpellProto()->SpellVisualID == 3580)
                 {
                     return true;
                 }
@@ -2638,7 +2638,7 @@ bool PlayerCondition::Meets(Player const* player, Map const* map, WorldObject co
             WorldObject const* searcher = source ? source : player;
             if (AreaTableEntry const* pAreaEntry = GetAreaEntryByAreaID(searcher->GetAreaId()))
             {
-                if ((!m_value1 || (pAreaEntry->flags & m_value1)) && (!m_value2 || !(pAreaEntry->flags & m_value2)))
+                if ((!m_value1 || (pAreaEntry->Flags & m_value1)) && (!m_value2 || !(pAreaEntry->Flags & m_value2)))
                 {
                     return true;
                 }
@@ -2746,25 +2746,25 @@ bool PlayerCondition::Meets(Player const* player, Map const* map, WorldObject co
                 }
 
                 // doesn't have skill
-                if (!player->HasSkill(skillInfo->skillId))
+                if (!player->HasSkill(skillInfo->SkillLine))
                 {
                     return false;
                 }
 
                 // doesn't match class
-                if (skillInfo->classmask && (skillInfo->classmask & player->getClassMask()) == 0)
+                if (skillInfo->ClassMask && (skillInfo->ClassMask & player->getClassMask()) == 0)
                 {
                     return false;
                 }
 
                 // doesn't match race
-                if (skillInfo->racemask && (skillInfo->racemask & player->getRaceMask()) == 0)
+                if (skillInfo->RaceMask && (skillInfo->RaceMask & player->getRaceMask()) == 0)
                 {
                     return false;
                 }
 
                 // skill level too low
-                if (skillInfo->min_value > player->GetSkillValue(skillInfo->skillId))
+                if (skillInfo->TrivialSkillLineRankLow > player->GetSkillValue(skillInfo->SkillLine))
                 {
                     return false;
                 }
@@ -3403,12 +3403,12 @@ bool PlayerCondition::CanBeUsedWithoutPlayer(uint16 entry)
  */
 SkillRangeType GetSkillRangeType(SkillLineEntry const* pSkill, bool racial)
 {
-    switch (pSkill->categoryId)
+    switch (pSkill->CategoryID)
     {
         case SKILL_CATEGORY_LANGUAGES:
             return SKILL_RANGE_LANGUAGE;
         case SKILL_CATEGORY_WEAPON:
-            if (pSkill->id != SKILL_FIST_WEAPONS)
+            if (pSkill->ID != SKILL_FIST_WEAPONS)
             {
                 return SKILL_RANGE_LEVEL;
             }
@@ -3418,7 +3418,7 @@ SkillRangeType GetSkillRangeType(SkillLineEntry const* pSkill, bool racial)
             }
         case SKILL_CATEGORY_ARMOR:
         case SKILL_CATEGORY_CLASS:
-            if (pSkill->id != SKILL_POISONS && pSkill->id != SKILL_LOCKPICKING)
+            if (pSkill->ID != SKILL_POISONS && pSkill->ID != SKILL_LOCKPICKING)
             {
                 return SKILL_RANGE_MONO;
             }
@@ -3429,7 +3429,7 @@ SkillRangeType GetSkillRangeType(SkillLineEntry const* pSkill, bool racial)
         case SKILL_CATEGORY_SECONDARY:
         case SKILL_CATEGORY_PROFESSION:
             // not set skills for professions and racial abilities
-            if (IsProfessionSkill(pSkill->id))
+            if (IsProfessionSkill(pSkill->ID))
             {
                 return SKILL_RANGE_RANK;
             }

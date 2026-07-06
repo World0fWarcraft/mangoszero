@@ -342,32 +342,32 @@ void PlayerbotFactory::InitPet()
     if (cInfo && cInfo->Family)
     {
         CreatureFamilyEntry const* cFamily = sCreatureFamilyStore.LookupEntry(cInfo->Family);
-        if (cFamily && (cFamily->skillLine[0] || cFamily->skillLine[1]))
+        if (cFamily && (cFamily->SkillLine[0] || cFamily->SkillLine[1]))
         {
             for (uint32 j = 0; j < sSkillLineAbilityStore.GetNumRows(); ++j)
             {
                 SkillLineAbilityEntry const* slab = sSkillLineAbilityStore.LookupEntry(j);
-                if (!slab || !slab->spellId)
+                if (!slab || !slab->Spell)
                 {
                     continue;
                 }
 
-                if (slab->skillId != cFamily->skillLine[0] && slab->skillId != cFamily->skillLine[1])
+                if (slab->SkillLine != cFamily->SkillLine[0] && slab->SkillLine != cFamily->SkillLine[1])
                 {
                     continue;
                 }
 
-                SpellEntry const* spellInfo = sSpellStore.LookupEntry(slab->spellId);
+                SpellEntry const* spellInfo = sSpellStore.LookupEntry(slab->Spell);
                 if (!spellInfo || IsPassiveSpell(spellInfo))
                 {
                     continue;
                 }
 
-                if (spellInfo->spellLevel > pet->getLevel())
+                if (spellInfo->SpellLevel > pet->getLevel())
                 {
                     continue;
                 }
-                pet->learnSpell(slab->spellId);
+                pet->learnSpell(slab->Spell);
             }
         }
     }
@@ -1161,18 +1161,18 @@ void PlayerbotFactory::EnchantItem(Item* item)
             continue;
         }
 
-        int32 requiredLevel = (int32)entry->baseLevel;
+        int32 requiredLevel = (int32)entry->BaseLevel;
         if (requiredLevel && (requiredLevel > itemLevel || requiredLevel < itemLevel - 35))
         {
             continue;
         }
 
-        if (entry->maxLevel && level > entry->maxLevel)
+        if (entry->MaxLevel && level > entry->MaxLevel)
         {
             continue;
         }
 
-        uint32 spellLevel = entry->spellLevel;
+        uint32 spellLevel = entry->SpellLevel;
         if (spellLevel && (spellLevel > level || spellLevel < level - 10))
         {
             continue;
@@ -1192,7 +1192,7 @@ void PlayerbotFactory::EnchantItem(Item* item)
             }
 
             SpellItemEnchantmentEntry const* enchant = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
-            if (!enchant || enchant->slot != PERM_ENCHANTMENT_SLOT)
+            if (!enchant || enchant->Flags != PERM_ENCHANTMENT_SLOT)
             {
                 continue;
             }
@@ -1200,12 +1200,12 @@ void PlayerbotFactory::EnchantItem(Item* item)
             uint8 sp = 0, ap = 0, tank = 0;
             for (int i = 0; i < 3; ++i)
             {
-                if (enchant->type[i] != ITEM_ENCHANTMENT_TYPE_STAT)
+                if (enchant->Effect[i] != ITEM_ENCHANTMENT_TYPE_STAT)
                 {
                     continue;
                 }
 
-                AddItemStats(enchant->spellid[i], sp, ap, tank);
+                AddItemStats(enchant->EffectArg[i], sp, ap, tank);
             }
 
             if (!CheckItemStats(sp, ap, tank))
@@ -1639,7 +1639,7 @@ void PlayerbotFactory::InitTalents(uint32 specNo)
         }
 
         TalentTabEntry const *talentTabInfo = sTalentTabStore.LookupEntry( talentInfo->TalentTab );
-        if (!talentTabInfo || talentTabInfo->tabpage != specNo)
+        if (!talentTabInfo || talentTabInfo->OrderIndex != specNo)
         {
             continue;
         }
@@ -1864,7 +1864,7 @@ void PlayerbotFactory::InitMounts()
     for (uint32 spellId = 0; spellId < sSpellStore.GetNumRows(); ++spellId)
     {
         SpellEntry const *spellInfo = sSpellStore.LookupEntry(spellId);
-        if (!spellInfo || spellInfo->EffectApplyAuraName[0] != SPELL_AURA_MOUNTED)
+        if (!spellInfo || spellInfo->EffectAura[0] != SPELL_AURA_MOUNTED)
         {
             continue;
         }

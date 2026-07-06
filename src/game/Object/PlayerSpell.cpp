@@ -321,8 +321,8 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
                     if (IsInWorld())                // not send spell (re-/over-)learn packets at loading
                     {
                         WorldPacket data(SMSG_SUPERCEDED_SPELL, (4));
-                        data << uint16(spell_old->Id);
-                        data << uint16(spell_new->Id);
+                        data << uint16(spell_old->ID);
+                        data << uint16(spell_new->ID);
                         GetSession()->SendPacket(&data);
                     }
 
@@ -413,33 +413,33 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
         for (SkillLineAbilityMap::const_iterator _spell_idx = skill_bounds.first; _spell_idx != skill_bounds.second; ++_spell_idx)
         {
             SkillLineAbilityEntry const* skillAbility = _spell_idx->second;
-            SkillLineEntry const* pSkill = sSkillLineStore.LookupEntry(skillAbility->skillId);
+            SkillLineEntry const* pSkill = sSkillLineStore.LookupEntry(skillAbility->SkillLine);
             if (!pSkill)
             {
                 continue;
             }
 
-            if (HasSkill(pSkill->id))
+            if (HasSkill(pSkill->ID))
             {
                 continue;
             }
 
-            if (skillAbility->learnOnGetSkill == ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL ||
+            if (skillAbility->AcquireMethod == ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL ||
                 // poison special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
-                (pSkill->id == SKILL_POISONS && skillAbility->max_value == 0) ||
+                (pSkill->ID == SKILL_POISONS && skillAbility->TrivialSkillLineRankHigh == 0) ||
                 // lockpicking special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
-                (pSkill->id == SKILL_LOCKPICKING && skillAbility->max_value == 0))
+                (pSkill->ID == SKILL_LOCKPICKING && skillAbility->TrivialSkillLineRankHigh == 0))
             {
-                switch (GetSkillRangeType(pSkill, skillAbility->racemask != 0))
+                switch (GetSkillRangeType(pSkill, skillAbility->RaceMask != 0))
                 {
                     case SKILL_RANGE_LANGUAGE:
-                        SetSkill(pSkill->id, 300, 300);
+                        SetSkill(pSkill->ID, 300, 300);
                         break;
                     case SKILL_RANGE_LEVEL:
-                        SetSkill(pSkill->id, 1, GetMaxSkillValueForLevel());
+                        SetSkill(pSkill->ID, 1, GetMaxSkillValueForLevel());
                         break;
                     case SKILL_RANGE_MONO:
-                        SetSkill(pSkill->id, 1, 1);
+                        SetSkill(pSkill->ID, 1, 1);
                         break;
                     default:
                         break;
@@ -493,7 +493,7 @@ bool Player::IsNeedCastPassiveLikeSpellAtLearn(SpellEntry const* spellInfo) cons
 
     // note: form passives activated with shapeshift spells be implemented by HandleShapeshiftBoosts instead of spell_learn_spell
     // talent dependent passives activated at form apply have proper stance data
-    bool need_cast = !spellInfo->Stances || (!form && spellInfo->HasAttribute(SPELL_ATTR_EX2_NOT_NEED_SHAPESHIFT));
+    bool need_cast = !spellInfo->ShapeshiftMask || (!form && spellInfo->HasAttribute(SPELL_ATTR_EX2_NOT_NEED_SHAPESHIFT));
 
     // Check CasterAuraStates
     return need_cast && (!spellInfo->CasterAuraState || HasAuraState(AuraState(spellInfo->CasterAuraState)));
@@ -687,25 +687,25 @@ void Player::removeSpell(uint32 spell_id, bool disabled, bool learn_low_rank)
         for (SkillLineAbilityMap::const_iterator _spell_idx = bounds.first; _spell_idx != bounds.second; ++_spell_idx)
         {
             SkillLineAbilityEntry const* skillAbility = _spell_idx->second;
-            SkillLineEntry const* pSkill = sSkillLineStore.LookupEntry(skillAbility->skillId);
+            SkillLineEntry const* pSkill = sSkillLineStore.LookupEntry(skillAbility->SkillLine);
             if (!pSkill)
             {
                 continue;
             }
 
-            if ((skillAbility->learnOnGetSkill == ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL &&
-                pSkill->categoryId != SKILL_CATEGORY_CLASS) ||// not unlearn class skills (spellbook/talent pages)
+            if ((skillAbility->AcquireMethod == ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL &&
+                pSkill->CategoryID != SKILL_CATEGORY_CLASS) ||// not unlearn class skills (spellbook/talent pages)
                 // poisons/lockpicking special case, not have ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL
-                ((pSkill->id == SKILL_POISONS || pSkill->id == SKILL_LOCKPICKING) && skillAbility->max_value == 0))
+                ((pSkill->ID == SKILL_POISONS || pSkill->ID == SKILL_LOCKPICKING) && skillAbility->TrivialSkillLineRankHigh == 0))
             {
                 // not reset skills for professions and racial abilities
-                if ((pSkill->categoryId == SKILL_CATEGORY_SECONDARY || pSkill->categoryId == SKILL_CATEGORY_PROFESSION) &&
-                    (IsProfessionSkill(pSkill->id) || skillAbility->racemask != 0))
+                if ((pSkill->CategoryID == SKILL_CATEGORY_SECONDARY || pSkill->CategoryID == SKILL_CATEGORY_PROFESSION) &&
+                    (IsProfessionSkill(pSkill->ID) || skillAbility->RaceMask != 0))
                 {
                     continue;
                 }
 
-                SetSkill(pSkill->id, 0, 0);
+                SetSkill(pSkill->ID, 0, 0);
             }
         }
     }
@@ -1216,13 +1216,13 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     SpellEntry const* TriggerSpell = sSpellStore.LookupEntry(spell->EffectTriggerSpell[0]);
 
     // known spell
-    if (HasSpell(TriggerSpell->Id))
+    if (HasSpell(TriggerSpell->ID))
     {
         return TRAINER_SPELL_GRAY;
     }
 
     // check race/class requirement
-    if (!IsSpellFitByClassAndRace(TriggerSpell->Id))
+    if (!IsSpellFitByClassAndRace(TriggerSpell->ID))
     {
         return TRAINER_SPELL_RED;
     }
@@ -1230,13 +1230,13 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     bool prof = SpellMgr::IsProfessionSpell(trainer_spell->spell);
 
     // check level requirement
-    uint32 spellLevel = reqLevel ? reqLevel : TriggerSpell->spellLevel;
+    uint32 spellLevel = reqLevel ? reqLevel : TriggerSpell->SpellLevel;
     if (getLevel() < spellLevel)
     {
         return TRAINER_SPELL_RED;
     }
 
-    if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(TriggerSpell->Id))
+    if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(TriggerSpell->ID))
     {
         // check prev.rank requirement
         if (spell_chain->prev && !HasSpell(spell_chain->prev))
@@ -1271,7 +1271,7 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     }
 
     // check primary prof. limit
-    if (sSpellMgr.IsPrimaryProfessionFirstRankSpell(spell->Id) && GetFreePrimaryProfessionPoints() == 0)
+    if (sSpellMgr.IsPrimaryProfessionFirstRankSpell(spell->ID) && GetFreePrimaryProfessionPoints() == 0)
     {
         return TRAINER_SPELL_GREEN_DISABLED;
     }

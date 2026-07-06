@@ -483,7 +483,7 @@ bool ChatHandler::isValidChatMessage(const char* message)
                         if (linkedSpell->HasAttribute(SPELL_ATTR_TRADESPELL))
                         {
                             // lookup skillid
-                            SkillLineAbilityMapBounds bounds = sSpellMgr.GetSkillLineAbilityMapBounds(linkedSpell->Id);
+                            SkillLineAbilityMapBounds bounds = sSpellMgr.GetSkillLineAbilityMapBounds(linkedSpell->ID);
                             if (bounds.first == bounds.second)
                             {
                                 return false;
@@ -496,7 +496,7 @@ bool ChatHandler::isValidChatMessage(const char* message)
                                 return false;
                             }
 
-                            SkillLineEntry const* skillLine = sSkillLineStore.LookupEntry(skillInfo->skillId);
+                            SkillLineEntry const* skillLine = sSkillLineStore.LookupEntry(skillInfo->SkillLine);
                             if (!skillLine)
                             {
                                 return false;
@@ -504,8 +504,8 @@ bool ChatHandler::isValidChatMessage(const char* message)
 
                             for (uint8 i = 0; i < MAX_LOCALE; ++i)
                             {
-                                uint32 skillLineNameLength = strlen(skillLine->name[i]);
-                                if (skillLineNameLength > 0 && strncmp(skillLine->name[i], buffer, skillLineNameLength) == 0)
+                                uint32 skillLineNameLength = strlen(skillLine->DisplayName_lang[i]);
+                                if (skillLineNameLength > 0 && strncmp(skillLine->DisplayName_lang[i], buffer, skillLineNameLength) == 0)
                                 {
                                     // found the prefix, remove it to perform spellname validation below
                                     // -2 = strlen(": ")
@@ -517,7 +517,7 @@ bool ChatHandler::isValidChatMessage(const char* message)
                         bool foundName = false;
                         for (uint8 i = 0; i < MAX_LOCALE; ++i)
                         {
-                            if (*linkedSpell->SpellName[i] && strcmp(linkedSpell->SpellName[i], buffer) == 0)
+                            if (*linkedSpell->Name_lang[i] && strcmp(linkedSpell->Name_lang[i], buffer) == 0)
                             {
                                 foundName = true;
                                 break;

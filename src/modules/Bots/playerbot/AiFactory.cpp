@@ -89,7 +89,7 @@ int AiFactory::GetPlayerSpecTab(Player* bot)
             TalentTabEntry const* tabEntry = sTalentTabStore.LookupEntry(bestId);
             if (tabEntry)
             {
-                return (int)tabEntry->tabpage;
+                return (int)tabEntry->OrderIndex;
             }
             return -1;
         }
@@ -142,7 +142,7 @@ map<uint32, int32> AiFactory::GetPlayerSpecTabs(Player* bot)
             uint32 spellid = talentInfo->RankID[rank];
             if (spellid && bot->HasSpell(spellid))
             {
-                tabs[talentTabInfo->TalentTabID]++;
+                tabs[talentTabInfo->ID]++;
                 found++;
             }
         }
@@ -171,7 +171,7 @@ bool AiFactory::IsFeralCatSpec(Player* bot)
         }
 
         TalentTabEntry const *talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
-        if ((!talentTabInfo) || ((classMask & talentTabInfo->ClassMask) == 0) || (talentTabInfo->tabpage != 1))
+        if ((!talentTabInfo) || ((classMask & talentTabInfo->ClassMask) == 0) || (talentTabInfo->OrderIndex != 1))
         {
             continue;
         }
@@ -182,11 +182,11 @@ bool AiFactory::IsFeralCatSpec(Player* bot)
             if (spellid && bot->HasSpell(spellid))
             {
                 SpellEntry const *spellInfo = sSpellStore.LookupEntry(spellid);
-                if (!spellInfo || !spellInfo->SpellName[0])
+                if (!spellInfo || !spellInfo->Name_lang[0])
                 {
                     continue;
                 }
-                std::string name = spellInfo->SpellName[0];
+                std::string name = spellInfo->Name_lang[0];
                 if (name == "Feline Swiftness")           catPoints++;
                 else if (name == "Thick Hide")            bearPoints++;
                 else if (name == "Feral Charge")          bearPoints++;
