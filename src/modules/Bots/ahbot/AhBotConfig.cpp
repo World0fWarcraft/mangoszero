@@ -8,6 +8,7 @@ using namespace std;
 INSTANTIATE_SINGLETON_1(AhBotConfig);
 
 AhBotConfig::AhBotConfig()
+    : enabled(false)
 {
 }
 

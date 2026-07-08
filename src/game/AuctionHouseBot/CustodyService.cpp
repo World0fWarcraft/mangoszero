@@ -296,6 +296,60 @@ void CustodyService::RollbackGoldRefund(CustodyDeferred& d,
     refundMail.SendMailToInTransaction(to, from, d);
 }
 
+void CustodyService::ReleaseGoldToWallet(CustodyDeferred& d, uint32 ownerGuid,
+                                         Player* ownerOnline, uint32 amount,
+                                         std::string const& key)
+{
+    if (ownerOnline)
+    {
+        ownerOnline->ModifyMoney(int32(amount));
+        ownerOnline->SaveInventoryAndGoldToDB();
+    }
+    else
+    {
+        // Offline: credit the persisted wallet inside the caller's open txn.
+        // This releases previously-reserved copper, so it cannot exceed what
+        // the holder could legitimately carry -- no cap check needed.
+        CharacterDatabase.PExecute(
+            "UPDATE `characters` SET `money` = `money` + %u WHERE `guid` = %u",
+            amount, ownerGuid);
+    }
+    CustodyLedger::SetState(key, CST_TERMINAL_BACK,
+                            static_cast<uint64>(time(NULL)));
+    (void)d;   // ordered-effects context; no mail effect is pushed here
+}
+
+void CustodyService::WriteResolutionApplied(uint32 auctionId, uint64 uuid)
+{
+    char key[32];
+    snprintf(key, sizeof(key), "resolve:%llu",
+             static_cast<unsigned long long>(uuid));
+
+    CustodyRow r;
+    r.id              = 0;
+    r.idemKey         = key;
+    r.kind            = CUSTODY_GOLD;
+    r.role            = ROLE_RESOLUTION;
+    r.state           = CST_TERMINAL_OK;
+    r.ownerGuid       = 0;
+    r.beneficiaryGuid = 0;
+    r.amount          = 0;
+    r.itemGuid        = 0;
+    r.auctionId       = auctionId;
+    r.createdTime     = static_cast<uint64>(time(NULL));
+    r.resolvedTime    = static_cast<uint64>(time(NULL));
+    CustodyLedger::Insert(r);
+}
+
+bool CustodyService::ResolutionApplied(uint64 uuid)
+{
+    char key[32];
+    snprintf(key, sizeof(key), "resolve:%llu",
+             static_cast<unsigned long long>(uuid));
+    CustodyRow row;
+    return CustodyLedger::Get(key, row);
+}
+
 void CustodyService::TopUpBid(std::string const& key, uint32 newAmount,
                               uint32 delta, Player* bidderOnline)
 {
@@ -328,11 +382,12 @@ void CustodyService::EscrowItem(uint32 ownerGuid, uint32 itemGuid,
 
 void CustodyService::DeliverItem(CustodyDeferred& d, std::string const& key,
                                  MailDraft& itemMail, MailReceiver const& to,
-                                 MailSender const& from)
+                                 MailSender const& from, uint32 checked)
 {
     CustodyLedger::SetState(key, CST_TERMINAL_OK,
                             static_cast<uint64>(time(NULL)));
-    itemMail.SendMailToInTransaction(to, from, d);
+    itemMail.SendMailToInTransaction(to, from, d,
+                                     static_cast<MailCheckMask>(checked));
 }
 
 void CustodyService::DeferEffect(CustodyDeferred& d,
@@ -354,6 +409,25 @@ void CustodyService::MaybeCrash(std::string const& phase)
         fflush(NULL);                                       // flush ALL stdio streams (incl. the log FILE*) -- _exit skips cleanup
         _exit(3);
     }
+}
+
+bool CustodyService::CommitCheckedOrForcedFail(std::string const& phase)
+{
+    // One-shot per process: the FIRST finalize whose phase is armed rolls back
+    // and reports failure (-> the caller runs its X6 in-memory undo and queues
+    // the redrive); the redrive's re-attempt takes the real checked commit and
+    // succeeds. This proves the worker book is never rolled back on a failed
+    // mangosd-side finalize. Inert (a plain checked commit) on a live realm.
+    static bool s_forcedFailFired = false;
+    if (!s_forcedFailFired && !phase.empty() &&
+        sConfig.GetStringDefault("AH.Service.CustodyFailCommitAt", "") == phase)
+    {
+        s_forcedFailFired = true;
+        sLog.outError("custody forced commit-fail: rollback at phase '%s' (TEST ONLY, one-shot)", phase.c_str());
+        CharacterDatabase.RollbackTransaction();
+        return false;
+    }
+    return CharacterDatabase.CommitTransactionChecked();
 }
 
 void CustodyService::ReconcileScan(bool dryRun, std::vector<CustodyRow>& orphans)

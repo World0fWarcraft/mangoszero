@@ -154,15 +154,10 @@ gone. ``ah repair force-forfeit <idem_key>`` is the explicit escape hatch after
 manual verification; it terminalizes the named drift row without disbursement
 or item mail.
 
-Promotion checklist before considering a default flip:
-
-* Run the full gate-off/gate-on differential with the database repo's
-  ``Tools/custody_diff.sql`` and get zero player-visible diffs.
-* Run ``src/modules/AhWorker/tools/custody_crash_test.md`` for every matrix row and
-  both crash phases.
-* Pass the concurrent-observer checks for auction list/search/console views.
-* Complete a live soak with custody still default-off, showing zero divergence
-  and no unresolved custody drift.
+Before enabling custody on a real realm, validate it first on a database clone
+and confirm ``ah repair`` reports zero drift after normal list, bid, buyout,
+cancel, and expire flows. Keep the setting default-off until the realm's live
+auction behavior has been observed cleanly.
 
 ah-service.conf keys
 ~~~~~~~~~~~~~~~~~~~~~
@@ -245,7 +240,7 @@ auction custody ledger. It reports custody drift by default, mutates only with
 ``ah repair apply`` or ``ah repair force-forfeit <idem_key>``, and never mints
 gold or sends replacement item mail from an orphan row.
 
-### SP-1: externalized AH browse (read path)
+### Worker AH browse path
 
 When the ah-service worker is connected and healthy, mangosd forwards AH browse
 / owner-list / bidder-list requests to it over IPC (IPC_BROWSE_QUERY) and
@@ -277,7 +272,7 @@ than ~1000 matches cannot be veto-checked exactly out-of-process, so the worker
 **declines** it and mangosd returns "AH temporarily unavailable" rather than a
 short or mis-counted page. This is rare (needs both >1000 surviving matches and a
 bound Lua hook) and follows the coordinator's "correct-or-unavailable" contract —
-**expected, not a regression** — so do not flag it during smoke testing.
+**expected, not a regression** — so do not treat it as a service failure.
 
 **Known limitation — Eluna `Player:SendAuctionMenu`.** The window-open gate lives
 in `WorldSession::SendAuctionHello`. A Lua script that calls
@@ -286,3 +281,68 @@ gate: while the worker is down the window opens, but its first browse returns th
 unavailable reply (an empty window). This affects only realms whose scripts call
 that API, and the fix would mean patching the third-party Eluna module, so it is
 left as a documented limitation.
+
+### Worker write-authority path
+
+`AH.Service.WriteAuthority` (in `mangosd.conf`, default `0`) hands the
+out-of-process worker authority over the auction book. When set, the worker is
+the **single writer** of the `auction` table: it inserts listings, applies
+player bids/buyouts/cancels, and runs the expiry/win tick, while mangosd forwards
+player mutations to it over the reliable IPC lane and applies the returned facts
+against the in-process custody escrow ledger.
+
+**Boot-latched flag.** The value is read once at startup (`LoadConfigSettings`
+only reads it when `!reload`), so `.reload config` can never toggle it mid-run --
+the process must be restarted to change it. This makes the "single book writer"
+invariant a per-boot property that no runtime reload can violate.
+
+**Hard requirement: `AH.Service.Custody = 1`.** The write path rides the custody
+escrow ledger (deposit/bid reservations, item escrow, seller payout netting).
+Enabling `WriteAuthority` with `Custody = 0` is unsupported.
+
+**Worker DB grant delta.** On top of the SELECT-only reader grants in *Security*
+above, a write-authority worker's DB account needs INSERT/UPDATE/DELETE on
+exactly two Character-DB tables -- and nothing else:
+
+```sql
+GRANT INSERT, UPDATE, DELETE ON `character0`.`auction`           TO 'ahworker'@'localhost';
+GRANT INSERT, UPDATE, DELETE ON `character0`.`ah_worker_journal` TO 'ahworker'@'localhost';
+```
+
+**Residual mangosd-side writers that stand down (spec section 5.7).** With
+`WriteAuthority = 1` these in-process auction writers no-op so there is exactly
+one book writer:
+
+* `AuctionHouseMgr::LoadAuctions` boot repair (item-template mismatch UPDATE,
+  missing-item / invalid-house row DELETE + return-mail) -- the worker's
+  `LoadFromDb` gates and reports instead.
+* `ObjectMgr::SetHighestGuids` auction-orphan `DELETE`.
+* `World::Update` `WUPDATE_AUCTIONS` in-process expiry sweep (`sAuctionMgr.Update`)
+  -- the worker runs the expiry/win tick; the returned-mail delivery still runs
+  in-process in both modes.
+* The in-process `AuctionHouseBot` startup (`sAuctionBot.Initialize`) -- the
+  worker's bot brain drives listings; the in-process buyer/seller stay null.
+
+Eluna AH hooks (`OnAdd` / `OnRemove`) still fire under write-authority: they are
+raised at the finalize position from the worker's facts on a synthesized
+transient `AuctionEntry`, so existing Lua AH scripts keep working.
+
+> **OPERATOR WARNING 1 -- do not `.reload config` Custody off while
+> WriteAuthority is on.** `WriteAuthority` is boot-latched but `Custody` is
+> reloadable. Reloading with `AH.Service.Custody = 0` while the worker still
+> holds write-authority bypasses the runtime custody invariant the write path
+> depends on and can corrupt in-flight escrow. If you must disable custody,
+> restart with `WriteAuthority = 0` as well.
+
+> **OPERATOR WARNING 2 -- apply the `ah_worker_journal` migration BEFORE enabling
+> WriteAuthority.** The worker records its committed mutations in
+> `ah_worker_journal`; the mangosd-side reconcile-on-reconnect reads it to decide
+> finalize-forward vs release. A missing table silently degrades reconcile to
+> "release", which can double-credit a mutation that actually committed. Verify
+> the migration is present first.
+
+Before enabling write-authority on a real realm, validate it first on a database
+clone with `AH.Service.WriteAuthority = 1` and `AH.Service.Custody = 1`. Exercise
+listing, bidding, outbidding, same-bidder buyout, seller cancel with an auction
+cut, expiry/win, worker reconnect, and mangosd restart. Then run `ah repair` and
+confirm it reports zero custody drift.

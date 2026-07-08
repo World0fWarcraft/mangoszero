@@ -99,6 +99,23 @@ class IpcServer
         bool PopInbound(IpcMessage& out);
 
         /**
+         * @brief [SP-2] Pop one frame from the UNBOUNDED reliable lane
+         *        (mutation-class frames, decision 10). Drain this to exhaustion
+         *        BEFORE PopInbound each pass so a browse flood on the bounded
+         *        queue can never starve a value-bearing frame.
+         * @return true if a reliable frame was available.
+         */
+        bool PopReliable(IpcMessage& out);
+
+        /**
+         * @brief [SP-2] Discard every frame in the reliable lane; returns the
+         *        count discarded. Called by the supervisor purge on child
+         *        death/respawn alongside ClearInbound (stale frames are also
+         *        dropped by the generation gate; this is belt-and-suspenders).
+         */
+        size_t ClearReliable();
+
+        /**
          * @brief Discard every frame currently in the inbound queue.
          *
          * Called by the supervisor on child death / before respawn so frames
@@ -139,6 +156,12 @@ class IpcServer
          * @param runId New run-id (supervisor increments per spawn).
          */
         void SetRunId(uint32 runId);
+
+        /**
+         * @brief Set the SP-2 write-authority bit sent in IPC_HELLO_ACK.
+         * Supervisor thread, before SpawnChild(); atomic store.
+         */
+        void SetWriteAuthority(bool on);
 
     private:
         BoundedQueue<IpcMessage>    m_inbound;
@@ -196,6 +219,14 @@ class IpcClient
          */
         bool PopInbound(IpcMessage& out);
 
+        /**
+         * @brief [SP-2] Pop one frame from the UNBOUNDED reliable lane
+         *        (mutation-class frames, decision 10). Drain to exhaustion
+         *        BEFORE PopInbound each pass.
+         * @return true if a reliable frame was available.
+         */
+        bool PopReliable(IpcMessage& out);
+
         /// True once the handshake has completed.
         bool Connected() const;
 
@@ -205,6 +236,12 @@ class IpcClient
          * Returns 0 until the handshake completes.
          */
         uint32 RunId() const;
+
+        /**
+         * @brief [SP-2] Write-authority bit received in IPC_HELLO_ACK.
+         * Returns false until the handshake completes (and for a legacy ACK).
+         */
+        bool WriteAuthority() const;
 
     private:
         BoundedQueue<IpcMessage>    m_inbound;

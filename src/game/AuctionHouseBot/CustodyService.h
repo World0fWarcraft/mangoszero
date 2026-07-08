@@ -137,6 +137,32 @@ namespace CustodyService
                             MailSender const& from);
 
     /**
+     * @brief [SP-2] Silently re-credit @p amount to @p ownerGuid's wallet for a
+     *        REJECTED/aborted reservation, then flip @p key's row to
+     *        CST_TERMINAL_BACK. Online: ModifyMoney(+amount) + save. Offline:
+     *        a direct `UPDATE characters SET money = money + amount` appended to
+     *        the caller's OPEN transaction. NO mail (legacy never mailed on a
+     *        rejection). Idempotency is the caller's (the row must be RESERVED).
+     */
+    void ReleaseGoldToWallet(CustodyDeferred& d, uint32 ownerGuid,
+                             Player* ownerOnline, uint32 amount,
+                             std::string const& key);
+
+    /**
+     * @brief [SP-2] Append the applied-record for a worker resolution:
+     *        a CST_TERMINAL_OK ROLE_RESOLUTION CUSTODY_GOLD row keyed
+     *        "resolve:<uuid>". Written INSIDE the finalize txn so applying value
+     *        and recording "done" commit atomically (spec 4.3-C1).
+     */
+    void WriteResolutionApplied(uint32 auctionId, uint64 uuid);
+
+    /**
+     * @brief [SP-2] True if the applied-record for @p uuid exists (the
+     *        RESOLVE_ACK DUPLICATE test; DUPLICATE == APPLIED).
+     */
+    bool ResolutionApplied(uint64 uuid);
+
+    /**
      * @brief Raise the held bid amount for an existing CST_RESERVED gold row.
      *
      * If `bidderOnline` is non-NULL, debits `delta` copper from the bidder's
@@ -178,10 +204,11 @@ namespace CustodyService
      * @param itemMail Pre-populated MailDraft carrying the item.
      * @param to       Mail receiver descriptor.
      * @param from     Mail sender descriptor.
+     * @param checked  Mail checked mask to persist with the mail row.
      */
     void DeliverItem(CustodyDeferred& d, std::string const& key,
                      MailDraft& itemMail, MailReceiver const& to,
-                     MailSender const& from);
+                     MailSender const& from, uint32 checked = 0);
 
     /**
      * @brief Append a generic live-world effect at the current call position.
@@ -203,6 +230,15 @@ namespace CustodyService
     /// simulate process death at that custody-seam transition. No-op when the
     /// config is empty (the live default), so it is inert on a real realm.
     void MaybeCrash(std::string const& phase);
+
+    /// TEST ONLY. Checked-commit wrapper for a finalize transaction. If
+    /// AH.Service.CustodyFailCommitAt == @p phase, rolls the caller's OPEN
+    /// CharacterDatabase transaction back and returns false ONCE (one-shot per
+    /// process) to simulate a failed finalize checked-commit, exercising the
+    /// redrive-without-rollback path (spec 4.1 step 4). Otherwise -- and always
+    /// once the one-shot has fired -- it just delegates to
+    /// CommitTransactionChecked(). Inert when the config is empty (live default).
+    bool CommitCheckedOrForcedFail(std::string const& phase);
 
     /**
      * @brief Audit custody-ledger drift.

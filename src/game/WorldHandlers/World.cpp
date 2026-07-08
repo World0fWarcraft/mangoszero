@@ -119,6 +119,8 @@
 #include "AuctionIntents.h"
 #include "BrowseMessages.h"
 #include "AuctionHouseBot/BrowsePending.h"
+#include "AuctionHouseBot/MutationPending.h"
+#include "PlayerMutations.h"
 
 #include <iostream>
 #include <sstream>
@@ -928,9 +930,32 @@ void World::SetInitialWorldSettings()
     // Delete all characters which have been deleted X days before
     Player::DeleteOldCharacters();
 
-    sLog.outString("Initialize AuctionHouseBot...");
-    sAuctionBot.Initialize();
-    sLog.outString();
+    // [SP-2 spec 5.7] Under WriteAuthority the out-of-process worker's bot brain
+    // drives all listings; the in-process AuctionHouseBot must not also write
+    // the book. Skipping Initialize() leaves its buyer/seller agents null, so
+    // its Update() (gated on !serviceActive in WUPDATE_AHBOT) and
+    // PurgeMailedItemsTick() both no-op (no agents / no configured bot GUID).
+    if (!IsAhWriteAuthority())
+    {
+        sLog.outString("Initialize AuctionHouseBot...");
+        sAuctionBot.Initialize();
+        sLog.outString();
+    }
+    else
+    {
+        // SP-2: the in-process bot AGENTS must not run under WriteAuthority (the
+        // worker's bot brain drives listings), but the bot owner GUID must still
+        // be resolved -- the worker's supervisor refuses to spawn on a 0 GUID,
+        // and the forged system owner is resolved as a side effect of loading
+        // the config. So load the config (which calls SetAHBotId -> the
+        // AHBOT_SYSTEM_OWNER name intercept, needing no real character) WITHOUT
+        // calling InitializeAgents().
+        sLog.outString("AuctionHouseBot: in-process agents disabled"
+                       " (AH.Service.WriteAuthority = 1; worker drives listings);"
+                       " resolving bot owner GUID for the worker supervisor");
+        sAuctionBotConfig.Initialize();
+        sLog.outString();
+    }
 
 #ifdef ENABLE_ELUNA
     ///- Run eluna scripts.
@@ -1163,7 +1188,14 @@ void World::Update(uint32 diff)
         }
 
         ///- Handle expired auctions
-        sAuctionMgr.Update();
+        // [SP-2 spec 5.7] Under WriteAuthority the worker runs the expiry/win
+        // tick and owns every auction-row write; mangosd's in-process expiry
+        // sweep must not also finalize/delete rows (double-writer). The
+        // returned-mail delivery above stays mangosd's and runs in both modes.
+        if (!IsAhWriteAuthority())
+        {
+            sAuctionMgr.Update();
+        }
     }
 
     /// <li> Handle AHBot operations
@@ -1186,6 +1218,12 @@ void World::Update(uint32 diff)
             {
                 sLog.outString("[AHSupervisor] AH service active -"
                                " in-process AuctionHouseBot standing down");
+                // SP-2 (spec 8): on the just-became-active edge, reconcile every
+                // in-flight player-mutation reservation against the shared worker
+                // journal (committed => finalize-forward, absent => release,
+                // cancel-prepared => abort + release). No-op when nothing is
+                // in-flight (the default-off / steady-state case).
+                AhReconcileOnReconnect();
             }
             else
             {
@@ -1231,6 +1269,16 @@ void World::Update(uint32 diff)
             if (now > custodyTerminalRetention)
             {
                 CustodyLedger::DeleteTerminalOlderThan(now - custodyTerminalRetention);
+            }
+
+            // SP-2 Task 13: reap bot-listing materializations whose auction
+            // never reached the shared `auction` table (a worker that died
+            // between the materialize reply and the book-commit). Only under
+            // WriteAuthority -- the legacy in-process bot owns its own book and
+            // never mints via this path.
+            if (IsAhWriteAuthority())
+            {
+                sAuctionIntentExecutor.SweepOrphanMaterializations(uint32(now));
             }
 
             s_nextCustodyReconcileTime = now + HOUR;
@@ -1319,6 +1367,11 @@ void World::Update(uint32 diff)
             {
                 HandleAhInbound(msgs[i]);
             }
+
+            // SP-2: retry failed value-finalizes and age un-answered player
+            // mutations into in-doubt tombstones (forward-only; never rolls
+            // back). Cheap no-op when both queues are empty.
+            AhProcessRedriveQueue(uint32(time(NULL)));
         }
 
         // Expire processed-uuid dedup entries. UNCONDITIONAL: the dedup cache
@@ -1672,6 +1725,55 @@ void World::HandleAhInbound(const IpcMessage& msg)
             AhAssembleBrowseListBody(finalEntries, totalcount, assembled);
             data.append(assembled.contents(), assembled.size());
             session->SendPacket(&data);
+            break;
+        }
+        case IPC_PLAYER_RESULT:
+        {
+            // SP-2 write-authority: worker mutation outcome + book facts.
+            // AhHandlePlayerMutationResult applies value only, fail-closed
+            // against the custody ledger. (IPC_RESOLVE_APPLY gets its own case
+            // in Task 12.)
+            ByteBuffer body(msg.body);
+            PlayerMutationResult res;
+            if (!res.Decode(body))
+            {
+                sLog.outError("[AHSupervisor] IPC_PLAYER_RESULT decode failed");
+                break;
+            }
+            AhHandlePlayerMutationResult(res);
+            break;
+        }
+        case IPC_RESOLVE_APPLY:
+        {
+            // SP-2 write-authority: worker-initiated resolution (WON / EXPIRED /
+            // CANCELLED_UNLOCK / REPAIR_RETURN). AhHandleResolveApply applies the
+            // per-kind value effects inside ONE checked txn with the
+            // resolve:<uuid> applied-record (DUPLICATE == APPLIED). An
+            // AH_RESOLVE_NO_ACK return is an unrecoverable protocol fault:
+            // already alarmed, NO ack is sent (the worker never retries it).
+            ByteBuffer body(msg.body);
+            ResolveApply ra;
+            if (!ra.Decode(body))
+            {
+                sLog.outError("[AHSupervisor] IPC_RESOLVE_APPLY decode failed");
+                break;
+            }
+            uint8 const st = AhHandleResolveApply(ra);
+            if (st == AH_RESOLVE_NO_ACK)
+            {
+                break;
+            }
+            WorkerSupervisor* const sv = GetAhSupervisor();
+            if (sv != NULL)
+            {
+                ResolveAck ack;
+                ack.uuid   = ra.uuid;
+                ack.status = st;
+                IpcMessage reply;
+                reply.op = IPC_RESOLVE_ACK;
+                ack.Encode(reply.body);
+                sv->Channel().SendFrame(reply);
+            }
             break;
         }
         default:
