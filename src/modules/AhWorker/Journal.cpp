@@ -24,9 +24,16 @@
 #include "Database/DatabaseEnv.h"
 
 #include <ctime>
+#include <limits>
 
 namespace
 {
+    enum PruneProtection
+    {
+        PRUNE_PROTECT_COMMITTED_RECONCILE,
+        PRUNE_PROTECT_APPLIED_IDEMPOTENCY
+    };
+
     /// Encode binary @p in as lowercase ASCII hex (NUL-safe for SQL literals).
     std::string HexEncode(std::string const& in)
     {
@@ -71,6 +78,45 @@ namespace
         }
         return out;
     }
+
+    bool CountPruneCandidates(ServiceDatabase& db, char const* ageColumn,
+                              uint8 state, uint64 cutoff, uint32 limit,
+                              PruneProtection protection, uint32& count)
+    {
+        char const* protectionClause = "";
+        if (protection == PRUNE_PROTECT_COMMITTED_RECONCILE)
+        {
+            protectionClause =
+                " AND NOT EXISTS (SELECT 1 FROM `custody_ledger` AS `c` "
+                "WHERE `c`.`auction_id` = `j`.`auction_id` "
+                "AND `c`.`state` = 0)";
+        }
+        else if (protection == PRUNE_PROTECT_APPLIED_IDEMPOTENCY)
+        {
+            protectionClause =
+                " AND NOT EXISTS (SELECT 1 FROM `custody_ledger` AS `c` "
+                "WHERE `c`.`idem_key` = CONCAT('resolve:', `j`.`uuid`)) "
+                "AND NOT EXISTS (SELECT 1 FROM `custody_ledger` AS `c` "
+                "WHERE `c`.`idem_key` = CONCAT('botlist:', `j`.`uuid`))";
+        }
+        QueryResult* result = db.Character().PQuery(
+            "SELECT COUNT(*) FROM ("
+            "SELECT `j`.`uuid` FROM `ah_worker_journal` AS `j` "
+            "WHERE `j`.`state` = %u AND `j`.`%s` < %llu%s "
+            "ORDER BY `j`.`%s`, `j`.`uuid` LIMIT %u"
+            ") AS `prune_candidates`",
+            static_cast<uint32>(state), ageColumn,
+            static_cast<unsigned long long>(cutoff), protectionClause,
+            ageColumn, limit);
+        if (result == NULL)
+        {
+            return false;
+        }
+
+        count = result->Fetch()[0].GetUInt32();
+        delete result;
+        return true;
+    }
 }
 
 void AhJournal::Insert(ServiceDatabase& db, JournalRow const& row)
@@ -96,6 +142,18 @@ void AhJournal::SetState(ServiceDatabase& db, uint64 uuid, uint8 state,
         static_cast<uint32>(state),
         static_cast<unsigned long long>(resolvedTime),
         static_cast<unsigned long long>(uuid));
+}
+
+void AhJournal::SetAppliedNow(ServiceDatabase& db, uint64 uuid)
+{
+    uint64 wallNow = static_cast<uint64>(time(NULL));
+    if (wallNow == std::numeric_limits<uint64>::max())
+    {
+        // Fail safe: retain the row instead of making a fresh APPLIED row look
+        // ancient to a wall-clock retention cutoff.
+        wallNow = UINT64_C(0x7FFFFFFFFFFFFFFF);
+    }
+    SetState(db, uuid, JRN_APPLIED, wallNow);
 }
 
 bool AhJournal::Get(ServiceDatabase& db, uint64 uuid, JournalRow& out)
@@ -181,10 +239,78 @@ void AhJournal::LoadActive(ServiceDatabase& db, std::vector<JournalRow>& out)
     delete result;
 }
 
-void AhJournal::DeleteAppliedOlderThan(ServiceDatabase& db, uint64 cutoff)
+bool AhJournal::DeleteTerminalBatchOlderThan(ServiceDatabase& db, uint64 cutoff,
+                                             uint32 batchRows, bool& hasMore,
+                                             uint32& deletedRows)
 {
-    db.Character().DirectPExecute(
-        "DELETE FROM `ah_worker_journal` WHERE `state` = %u AND `resolved_time` < %llu",
-        static_cast<uint32>(JRN_APPLIED),
-        static_cast<unsigned long long>(cutoff));
+    hasMore = false;
+    deletedRows = 0u;
+    if (batchRows == 0u)
+    {
+        return true;
+    }
+
+    uint32 committedCount = 0u;
+    uint32 appliedCount = 0u;
+    if (!CountPruneCandidates(db, "created_time", JRN_COMMITTED, cutoff,
+                              batchRows, PRUNE_PROTECT_COMMITTED_RECONCILE,
+                              committedCount) ||
+        !CountPruneCandidates(db, "resolved_time", JRN_APPLIED, cutoff,
+                              batchRows, PRUNE_PROTECT_APPLIED_IDEMPOTENCY,
+                              appliedCount))
+    {
+        return false;
+    }
+
+    if (committedCount == 0u && appliedCount == 0u)
+    {
+        return true;
+    }
+
+    if (!db.Character().BeginTransaction())
+    {
+        return false;
+    }
+
+    bool queued = true;
+    if (committedCount != 0u)
+    {
+        queued = db.Character().PExecute(
+            "DELETE FROM `ah_worker_journal` "
+            "WHERE `state` = %u AND `created_time` < %llu "
+            "AND NOT EXISTS (SELECT 1 FROM `custody_ledger` AS `c` "
+            "WHERE `c`.`auction_id` = `ah_worker_journal`.`auction_id` "
+            "AND `c`.`state` = 0) "
+            "ORDER BY `created_time`, `uuid` LIMIT %u",
+            static_cast<uint32>(JRN_COMMITTED),
+            static_cast<unsigned long long>(cutoff), committedCount);
+    }
+    if (queued && appliedCount != 0u)
+    {
+        queued = db.Character().PExecute(
+            "DELETE FROM `ah_worker_journal` "
+            "WHERE `state` = %u AND `resolved_time` < %llu "
+            "AND NOT EXISTS (SELECT 1 FROM `custody_ledger` AS `c` "
+            "WHERE `c`.`idem_key` = CONCAT('resolve:', "
+            "`ah_worker_journal`.`uuid`)) "
+            "AND NOT EXISTS (SELECT 1 FROM `custody_ledger` AS `c` "
+            "WHERE `c`.`idem_key` = CONCAT('botlist:', "
+            "`ah_worker_journal`.`uuid`)) "
+            "ORDER BY `resolved_time`, `uuid` LIMIT %u",
+            static_cast<uint32>(JRN_APPLIED),
+            static_cast<unsigned long long>(cutoff), appliedCount);
+    }
+    if (!queued)
+    {
+        db.Character().RollbackTransaction();
+        return false;
+    }
+    if (!db.Character().CommitTransactionChecked())
+    {
+        return false;
+    }
+
+    deletedRows = committedCount + appliedCount;
+    hasMore = committedCount == batchRows || appliedCount == batchRows;
+    return true;
 }
