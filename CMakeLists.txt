@@ -64,6 +64,7 @@ option(PCH                  "Enable precompiled headers"                    ON)
 option(DEBUG                "Enable debug build (only on non IDEs)"         OFF)
 option(WITHOUT_GIT          "Disable Git revision detection"                OFF)
 option(BUILD_AH_SERVICE     "Build the out-of-process auction-house service" ON)
+option(BUILD_TESTING        "Build focused regression tests"                OFF)
 #==================================================================================
 message("")
 message(
@@ -146,6 +147,11 @@ endif()
 
 find_package(Threads REQUIRED)
 find_package(OpenSSL 3.0 REQUIRED)
+# OpenSSL 4.x support is intentionally deferred until the OpenSSL 4.2 LTS migration.
+if(OPENSSL_VERSION VERSION_GREATER_EQUAL "4.0.0")
+  message(FATAL_ERROR
+    "Unsupported OpenSSL ${OPENSSL_VERSION}: MaNGOS currently requires >=3.0.0 and <4.0.0")
+endif()
 find_package(MySQL REQUIRED)
 
 # =============================================================================
@@ -216,6 +222,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/CMakeLists.txt")
   add_subdirectory(src)
 else()
   message(WARNING "Source directory 'src' not found. Nothing to build.")
+endif()
+
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
 endif()
 
 # =============================================================================
