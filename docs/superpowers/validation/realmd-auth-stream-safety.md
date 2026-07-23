@@ -17,26 +17,32 @@ submodule. The installed Testing realmd now:
 - flushes buffered debug records about once per second while realmd remains
   active.
 
-No mangosd production source, shared network backend, database, protected
-source checkout, or client file was changed.
+No mangosd production behavior, shared network backend, database, protected
+source checkout, or client file was changed. The post-merge parent follow-up
+only relocates the existing locale and time declarations into dedicated shared
+headers required by the merged realmd.
 
 ## Revisions
 
 - Parent branch: `fix/realmd-auth-stream-safety`
 - Parent implementation commit: `3526737067c418c422ac33b8ef7286e72c749385`
 - Parent live-log regression commit: `dd046df57ca0ecff1428f059381feb5d2981fc2c`
+- Parent squash merge: `c87a505b87bc7bb498363541a2df6ac2d0b89be4`
 - Realmd branch: `fix/auth-stream-safety`
-- Realmd implementation tip: `a571d214aac54491c89375a4a0645a782ecc1fd8`
+- Realmd implementation tip: `253788fc3190e10068d07c139ee44fdba7085ea4`
 - Realmd-compatible base: `3cf5f9690477a0bc2b33eb17eb1d9016da1d47e8`
 
-The GitHub sweep found realmd default-branch tip `39b7846`, with PRs #27,
-#28, and #29 merged and no open pull requests. A build against Zero proved
-that tip is not currently parent-compatible: realmd PR #27 includes
-`Common/Locales.h` and `Common/TimeConstants.h`, neither of which exists in
-mangoszero/server, including current upstream `master`. Zero continues to pin
-`3cf5f96`, which carries the same provider-exit fix as PR #29 without that
-header split. The hardening branch was rebased to the compatible commit before
-production changes continued.
+The initial GitHub sweep found realmd default-branch tip `39b7846`. A build
+against Zero proved that tip was not parent-compatible because realmd PR #27
+requires `Common/Locales.h` and `Common/TimeConstants.h`, which Zero did not
+yet provide. The hardening branch was therefore tested on compatible base
+`3cf5f96`.
+
+After both hardening PRs were squash-merged, realmd master became `253788fc`.
+The parent follow-up extracts Zero's unchanged locale and time declarations
+from `Common.h` into the same dedicated headers used by the other cores, keeps
+`Common.h` including them for existing callers, and advances the submodule to
+the merged realmd commit.
 
 ## RED Evidence
 
